@@ -87,7 +87,7 @@ setInterval(() => {
                 //price: actualValue - 1,//preço limit
                 ordType:"Stop",//tipo
                 stopPx: actualValue - 170, //% do Stop
-                side: "Buy"
+                side: "Sell"
                 },
             //Objeto de stop - Venda    
             stopSell = {
@@ -96,7 +96,7 @@ setInterval(() => {
                 //price: actualValue + 1,//preço limit
                 ordType:"Stop",//tipo
                 stopPx: actualValue + 170, //% do Stop
-                side: "Sell"
+                side: "Buy"
             }    
 
 //###########################################################################################################
