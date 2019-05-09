@@ -1,12 +1,12 @@
 /*
-BotRage V2.0 
-author: Victor Ratts
-linguagem: Js
-distrib.: LICENSIADO
-dependencias: Vide pacage.json
+    BotRage V2.2 
+    author: Victor Ratts
+    linguagem: Js
+    distrib.: LICENSIADO
+    dependencias: Vide pacage.json
 
-bot com inplantação para bitmenx
-uso comercial
+    bot com inplantação para bitmenx
+    uso comercial
 */
 
 //primeiras definições
@@ -15,17 +15,15 @@ const renko = require('technicalindicators').renko;
 const SMA = require('technicalindicators').SMA;
 var crypto = require('crypto');
 const setTime = 10 * 1000;
-const user = 'Anonymous';
-const frontPort = 8080;
-const frontRequest = 'http://localhost:'+frontPort;
+const config = require('./config/config');
+const user = config.user;
+const frontPort = config.port;
+const frontRequest = config.locaRequest+frontPort;
 const symbolDefault = 'XBTUSD';
-const uriPost = 'https://testnet.bitmex.com';
+const uriPost = config.remoteRequest;
 //api keys
-const apiKey = "nP9euRcR6HqvfUmt62T6so7B";
-const apiSecret = "DpIxTi96p8y3kj5lETsOmJVEoRlgmpfvVfVHt7CWTb7XRC5E";
-
-
-
+const apiKey = config.keyId;
+const apiSecret = config.keySecr;
 
 //execução de ordens
 setInterval(() => {
@@ -44,13 +42,16 @@ setInterval(() => {
         if(err){
             console.log('\033c algum problema de requisição, verifique o erro -> '+ err);
         }else{
-            console.log('\033c Bem-Vindo ao BotRage v1.0 \n \x1b[33m dados obtidos com sucesso, trabalhando com informações');
+            console.log('\033c Bem-Vindo ao BotRage v1.0 \n \x1b[33m dados obtidos com sucesso, trabalhando com informações \n Usuario: '+user);
             var actualValue = body.c.slice(-1)[0];
             var actualValueBuy = body.h.slice(-1)[0];
             var actualValueSell = body.l.slice(-1)[0];
 //=======================================Metodos de compra, venda, close, Stop=================================
-            var POST = 'POST',
+            var
+            POST = 'POST',
+            Del = 'DELETE',
             path = '/api/v1/order',
+            pathClose = '/api/v1/order/closePosition',
             expire = new Date().getTime() / 1000, // 1 min in the future
             expires = parseInt(expire) + 60,
             //objeto de compra
@@ -75,12 +76,16 @@ setInterval(() => {
             close = {
                 symbol: symbolDefault
             },
+            Dell = {
+                symbol: symbolDefault,
+                text: 'Send From BotRage V1.0'
+            },
             //Objeto de stop - Compra
             stopBuy = {
                 symbol: symbolDefault,//par
                 orderQty: 31,//quantidade de contratos
                 //price: actualValue - 1,//preço limit
-                ordType:"StopLimit",//tipo
+                ordType:"Stop",//tipo
                 stopPx: actualValue - 170, //% do Stop
                 side: "Buy"
                 },
@@ -89,7 +94,7 @@ setInterval(() => {
                 symbol: symbolDefault,//par
                 orderQty: 31,//quantidade de contratos
                 //price: actualValue + 1,//preço limit
-                ordType:"StopLimit",//tipo
+                ordType:"Stop",//tipo
                 stopPx: actualValue + 170, //% do Stop
                 side: "Sell"
             }    
@@ -140,7 +145,7 @@ setInterval(() => {
 //==============Close=============================Fechamento====================================================
                 var postBody = JSON.stringify(close);
 
-                var signatureClose = crypto.createHmac('sha256', apiSecret).update(POST + path + expires + postBody).digest('hex');
+                var signatureClose = crypto.createHmac('sha256', apiSecret).update(POST + pathClose + expires + postBody).digest('hex');
                 console.log('Assinatura Close -> '+signatureClose);
                 var headers = {
                 'content-type' : 'application/json',
@@ -152,7 +157,7 @@ setInterval(() => {
                 };
                 const requestOptionsClose = {
                 headers: headers,
-                url: uriPost + path,
+                url: uriPost + pathClose,
                 method: POST,
                 body: postBody 
                 }
@@ -194,6 +199,26 @@ setInterval(() => {
                 method: POST,
                 body: postBody 
                 }
+//======================================Delete==================================================================
+                var postBody = JSON.stringify(Dell);
+
+                var signatureDell = crypto.createHmac('sha256', apiSecret).update(Del + path + expires + postBody).digest('hex');
+                console.log('Assinatura Stop/Sell -> '+signatureDell);
+                var headers = {
+                'content-type' : 'application/json',
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'api-expires': expires,
+                'api-key': apiKey,
+                'api-signature': signatureDell
+                };
+                const requestOptionsDell = {
+                headers: headers,
+                url: uriPost + path,
+                method: Del,
+                body: postBody 
+                }
+
 //##############################################################################################################
 //############################# Funções do BOT, Medias Moveis, Compra e venda ##################################
 //##############################################################################################################
@@ -267,43 +292,87 @@ request({
 //######################################### Referenciais do FrontEnd ###########################################
 //##############################################################################################################
 
-    
+//-------------------------------------------functions----------------------------------------------------------
+
+//função de compra
+function buyFunction(){
+        if(body.side == 'Sell'){
+            //Fechando Ordens
+            console.log('parada para compra');
+            request(requestOptionsClose, function(error, response, body) {
+            if (error) { console.log(error); }
+            console.log(body);
+            });
+            //delete
+            console.log('Deletando Ordens Abertas');
+            request(requestOptionsDell, function(error, response, body) {
+            if (error) { console.log(error); }
+            console.log(body);
+            });
+
+        }
+        setTimeout(() => {   
+            //stop
+            request(requestOptionsStopBuy, function(error, response, body) {
+                if (error) { console.log(error); }
+                console.log(body);
+            });
+            //Ordem de Venda
+                console.log(' \x1b[32m executando compra:');
+                request(requestOptionsBuy, function(error, response, body) {
+                if (error) { console.log(error); }
+                console.log(body);
+            });
+        }, 2000);   
+}
+
+//função de venda
+function sellFunction(){
+    if(body.side == 'Buy'){                   
+            //Fechando Ordens abertas
+            console.log('parada para Venda');
+            request(requestOptionsClose, function(error, response, body) {
+            if (error) { console.log(error); }
+            console.log(body);
+            });
+            //delete
+            console.log('Deletando Ordens Abertas');
+            request(requestOptionsDell, function(error, response, body) {
+            if (error) { console.log(error); }
+            console.log(body);
+            });
+        }
+    setTimeout(() => {
+            //Stop
+            request(requestOptionsStopSell, function(error, response, body) {
+            if (error) { console.log(error); }
+            console.log(body);
+             });   
+            //Ordem de Venda
+            console.log(' \x1b[32m executando Venda:');
+            request(requestOptionsSell, function(error, response, body) {
+            if (error) { console.log(error); }
+            console.log(body);
+        });
+    }, 2000)
+}
+
 //------------------------ cruzamento 01 - Compra --------------------------------------------------------------------------
-                    if(MA1.slice(-1)[0] > MA2.slice(-1)[0]){
-                        if(body.side == 'Sell'){
-                            //stop
-                            request(requestOptionsStopBuy, function(error, response, body) {
-                                if (error) { console.log(error); }
-                                console.log(body);
-                            });   
-                            //executa Ordem de compra
-                            console.log(' \x1b[32m executando compra:');
-                            request(requestOptionsBuy, function(error, response, body) {
-                                if (error) { console.log(error); }
-                                console.log(body);
-                            });
+                    if(MA1.slice(-1)[0] > MA2.slice(-1)[0]){//condicional de cruzamento
+                            if(body.side == 'Buy'){
+                                console.log('Compra executada... Aguardando Venda');
                             }else{
-                            console.log('Ordem de compra ja foi executada...');
-                            }    
+                                buyFunction();
+                            }
                         }else{
                         console.log('Aguardando proximo Cruzamento...')
                     }
 //------------------------ Cruzamento 02 - Venda -------------------------------------------------------------------------
-                    if(MA1.slice(-1)[0] < MA2.slice(-1)[0]){
-                        if(body.side == 'Buy'){
-                            //stop
-                            request(requestOptionsStopBuy, function(error, response, body) {
-                                if (error) { console.log(error); }
-                                console.log(body);
-                            });    
-                            //Ordem de Venda
-                            console.log(' \x1b[32m executando Venda:');
-                            request(requestOptionsSell, function(error, response, body) {
-                                if (error) { console.log(error); }
-                                console.log(body);
-                            });
-                            }else{
-                            console.log('Ordem de Venda ja foi executada...');
+                    if(MA1.slice(-1)[0] < MA2.slice(-1)[0]){//condicional de cruzamento
+                        if(body.side == 'Sell'){
+                            console.log('Venda executada... Aguardando Compra');
+                        }else{
+                            sellFunction();
                         }
                     }else{
                         console.log('Aguardando proximo Cruzamento...')
