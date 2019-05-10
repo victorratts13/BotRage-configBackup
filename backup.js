@@ -4,7 +4,6 @@
     linguagem: Js
     distrib.: LICENSIADO
     dependencias: Vide pacage.json
-
     bot com inplantação para bitmenx
     uso comercial
 */
@@ -51,6 +50,7 @@ setInterval(() => {
             POST = 'POST',
             Del = 'DELETE',
             path = '/api/v1/order',
+            pathDell = '/api/v1/order/all'
             pathClose = '/api/v1/order/closePosition',
             expire = new Date().getTime() / 1000, // 1 min in the future
             expires = parseInt(expire) + 60,
@@ -214,7 +214,7 @@ setInterval(() => {
                 };
                 const requestOptionsDell = {
                 headers: headers,
-                url: uriPost + path,
+                url: uriPost + pathDell,
                 method: Del,
                 body: postBody 
                 }
